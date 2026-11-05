@@ -30,7 +30,16 @@ ruff check .                    # lint
 
 ## Linear Issues
 
-TODO: four links, one per branch.
+## Linear Issues
+
+## Linear Issues
+
+Project: Orbit Air Baggage Desk
+
+- [NIK-5 · feature/schema-and-filing](https://linear.app/nikita-ravi/issue/NIK-5/featureschema-and-filing-tables-filing-validation-deadline-list)
+- [NIK-6 · feature/assign-and-status](https://linear.app/nikita-ravi/issue/NIK-6/featureassign-and-status-assign-resolve-close-allowed-changes-history)
+- [NIK-7 · feature/deadlines-and-escalation](https://linear.app/nikita-ravi/issue/NIK-7/featuredeadlines-and-escalation-overdue-rule-escalation-sweep-rollback)
+- [NIK-8 · feature/cli](https://linear.app/nikita-ravi/issue/NIK-8/featurecli-all-commands-now-option-seed)
 
 ## Setup Check
 
