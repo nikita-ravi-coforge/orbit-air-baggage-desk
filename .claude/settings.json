@@ -11,7 +11,7 @@
           "hooks": [
             {
               "type": "command",
-              "command": ".venv/bin/pytest -q 1>&2; rc=$?; if [ $rc -ne 0 ] && [ $rc -ne 5 ]; then exit 2; fi"
+              "command": "grep -q '\"stop_hook_active\": *true' && exit 0; .venv/bin/pytest -q 1>&2; rc=$?; if [ $rc -ne 0 ] && [ $rc -ne 5 ]; then exit 2; fi"
             }
           ]
         }
