@@ -11,7 +11,7 @@ Requires Python 3.12 or above.
 ```bash
 git clone https://github.com/nikita-ravi-coforge/orbit-air-baggage-desk.git
 cd orbit-air-baggage-desk
-python3 -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
