@@ -1,0 +1,20 @@
+# Virtual environment
+.venv/
+
+# Secrets
+.env
+.env.*
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Personal Claude Code notes
+CLAUDE.local.md
