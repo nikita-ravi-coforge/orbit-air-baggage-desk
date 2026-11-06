@@ -105,6 +105,19 @@ of both the agent's context and the repository.
 - `git diff --stat HEAD -- tests/` was empty after coding, so no test changed after the red commit. I ran `pytest` myself (26 passed), confirmed no clock calls, and confirmed the status, agent, and history writes share one `with conn:` block.
 ## Hidden Instruction Check
 
+### feature/deadlines-and-escalation
+
+**Prompt:** Drafted tests with a prompt that fixed the interface (`escalate(conn, now)` returning ids in order, `change_status` refusing an escalation that isn't overdue) and spelled out the rollback test: file first, then install a trigger that aborts history inserts, then assign and read back on the same connection. For the code, I gave the NIK-7 issue and asked for a plan before any edits.
+
+**What the agent did:** Wrote `tests/test_escalation.py` (6 functions, 11 tests) and listed 11 assumptions. It pointed out that the rollback test would already pass, because the transaction existed since branch 2. Then added `is_overdue`, the deadline gate in `change_status`, and the `escalate` sweep. 37 passed.
+
+**What I checked or changed:**
+- I approved the plan this time, so the agent wrote the test file itself. I reviewed it before committing.
+- Red was correct: 9 tests failed with AttributeError (no `escalate`), and 1 failed with DID NOT RAISE (no deadline gate).
+- **Rollback proof:** the rollback test passed before any feature code, so on its own it proved nothing. I temporarily added `conn.commit()` between the UPDATE and the history INSERT in `change_status`. The test failed with `AssertionError: assert 'assigned' == 'open'`. I reverted with `git checkout claims.py` and got 37 passed. The test passes with the transaction and fails without it.
+- Green phase: the agent asked before touching the existing transaction. It proposed widening the SELECT to also read `deadline`, or adding a separate SELECT. I chose widening the existing SELECT, so the check stays in the same `with conn:` block. It chose not to catch exceptions in `escalate`, so real database errors surface. I agreed. I also accepted its offer to document the new ValueError in the docstring.
+- `git diff --stat` on tests/ was empty after coding. I ran `pytest` myself (37 passed) and confirmed the overdue check uses `>` on parsed datetimes.
+
 TODO
 
 ## Overdue Demonstration
