@@ -10,6 +10,13 @@ TIERS = ("standard", "silver", "gold")
 STATUSES = ("open", "assigned", "escalated", "resolved", "closed")
 TIER_HOURS = {"gold": 4, "silver": 24, "standard": 72}
 SYSTEM = "system"
+ALLOWED_CHANGES = {
+    "open": {"assigned", "escalated"},
+    "assigned": {"resolved", "escalated"},
+    "escalated": {"assigned", "resolved"},
+    "resolved": {"closed"},
+    "closed": set(),
+}
 
 CLAIM_COLUMNS = (
     "id, passenger, flight, type, tier, status, agent, note, filed_at, deadline"
@@ -74,12 +81,66 @@ def get_claim(conn, claim_id):
 
 
 def get_history(conn, claim_id):
-    """Return the claim's history rows as dicts, oldest first."""
+    """Return the claim's history rows as dicts, oldest first. Raise ValueError if unknown."""
+    get_claim(conn, claim_id)
     rows = conn.execute(
         f"SELECT {HISTORY_COLUMNS} FROM history WHERE claim_id = ? ORDER BY id",
         (claim_id,),
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def change_status(conn, claim_id, new_status, changed_by, now, agent=None):
+    """Move a claim to new_status and record it in history, in one transaction.
+
+    This is the only function that reads ALLOWED_CHANGES. If agent is given, it is set
+    in the same UPDATE as the status. Raise ValueError naming the id if the claim does
+    not exist, or ValueError mentioning status if the move is not allowed. On any error
+    nothing is written.
+    """
+    changed_at = _format_time(now)
+    with conn:
+        row = conn.execute("SELECT status FROM claims WHERE id = ?", (claim_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"claim {claim_id} not found")
+        old_status = row["status"]
+        if new_status not in ALLOWED_CHANGES[old_status]:
+            raise ValueError(
+                f"cannot change status of claim {claim_id} from {old_status!r} "
+                f"to {new_status!r}"
+            )
+
+        if agent is None:
+            conn.execute(
+                "UPDATE claims SET status = ? WHERE id = ?", (new_status, claim_id)
+            )
+        else:
+            conn.execute(
+                "UPDATE claims SET status = ?, agent = ? WHERE id = ?",
+                (new_status, agent, claim_id),
+            )
+        conn.execute(
+            """
+            INSERT INTO history (claim_id, old_status, new_status, changed_by, changed_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (claim_id, old_status, new_status, changed_by, changed_at),
+        )
+
+
+def assign(conn, claim_id, agent, now):
+    """Assign the claim to agent. The agent is recorded as the one who made the change."""
+    change_status(conn, claim_id, "assigned", agent, now, agent=agent)
+
+
+def resolve(conn, claim_id, now):
+    """Mark the claim resolved, keeping its agent."""
+    change_status(conn, claim_id, "resolved", SYSTEM, now)
+
+
+def close(conn, claim_id, now):
+    """Close a resolved claim, keeping its agent."""
+    change_status(conn, claim_id, "closed", SYSTEM, now)
 
 
 def list_claims(conn, status=None, tier=None):
