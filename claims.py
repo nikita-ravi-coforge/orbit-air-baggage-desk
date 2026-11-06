@@ -3,7 +3,7 @@
 Nothing here reads the clock. Any function that needs the current time takes it as `now`.
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 CLAIM_TYPES = ("delayed", "lost", "damaged")
 TIERS = ("standard", "silver", "gold")
@@ -42,6 +42,11 @@ def _validate_filing(passenger, flight, claim_type, tier):
 def compute_deadline(filed_at, tier):
     """Return the deadline for a claim filed at filed_at with the given tier."""
     return filed_at + timedelta(hours=TIER_HOURS[tier])
+
+
+def is_overdue(deadline_text, now):
+    """Return True only if now is strictly later than the stored deadline."""
+    return now > datetime.fromisoformat(deadline_text)
 
 
 def file_claim(conn, *, passenger, flight, claim_type, tier, note=None, now):
@@ -97,10 +102,13 @@ def change_status(conn, claim_id, new_status, changed_by, now, agent=None):
     in the same UPDATE as the status. Raise ValueError naming the id if the claim does
     not exist, or ValueError mentioning status if the move is not allowed. On any error
     nothing is written.
+    Raise ValueError if new_status is "escalated" and the claim is not overdue at now.
     """
     changed_at = _format_time(now)
     with conn:
-        row = conn.execute("SELECT status FROM claims WHERE id = ?", (claim_id,)).fetchone()
+        row = conn.execute(
+            "SELECT status, deadline FROM claims WHERE id = ?", (claim_id,)
+        ).fetchone()
         if row is None:
             raise ValueError(f"claim {claim_id} not found")
         old_status = row["status"]
@@ -108,6 +116,11 @@ def change_status(conn, claim_id, new_status, changed_by, now, agent=None):
             raise ValueError(
                 f"cannot change status of claim {claim_id} from {old_status!r} "
                 f"to {new_status!r}"
+            )
+        if new_status == "escalated" and not is_overdue(row["deadline"], now):
+            raise ValueError(
+                f"cannot escalate claim {claim_id}: not overdue "
+                f"(deadline {row['deadline']})"
             )
 
         if agent is None:
@@ -141,6 +154,23 @@ def resolve(conn, claim_id, now):
 def close(conn, claim_id, now):
     """Close a resolved claim, keeping its agent."""
     change_status(conn, claim_id, "closed", SYSTEM, now)
+
+
+def escalate(conn, now):
+    """Escalate every overdue open or assigned claim, one transaction per claim.
+
+    Return the ids escalated, in id order. Claims in other statuses or not yet overdue
+    are left alone.
+    """
+    rows = conn.execute(
+        "SELECT id, deadline FROM claims WHERE status IN ('open', 'assigned') ORDER BY id"
+    ).fetchall()
+    escalated = []
+    for row in rows:
+        if is_overdue(row["deadline"], now):
+            change_status(conn, row["id"], "escalated", SYSTEM, now)
+            escalated.append(row["id"])
+    return escalated
 
 
 def list_claims(conn, status=None, tier=None):
