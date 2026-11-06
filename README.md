@@ -76,7 +76,7 @@ of both the agent's context and the repository.
 
 ## Agent Log
 
-TODO: one entry per branch.
+Green phase: the agent proposed change_status(..., agent=None) with the agent update in the same transaction, or a private helper. I chose the agent= version so change_status stays the only reader of ALLOWED_CHANGES. Its plan had agent keyword-only; my instruction overrode that and it followed my spec. 26 passed in my own terminal, with no test file changed since the red commit.
 
 ## Hidden Instruction Check
 
